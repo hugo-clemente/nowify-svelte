@@ -7,18 +7,21 @@
 		skipToNext,
 		skipToPrevious,
 		startPlayback,
-		unlikeTrack
+		unlikeTrack,
+		getSongLyrics
 	} from '$lib/spotify';
 	import { onDestroy, onMount } from 'svelte';
 	import Vibrant from 'node-vibrant';
-	import { SkipBack, SkipForward, Play, Pause, Heart } from 'phosphor-svelte';
+	import { SkipBack, SkipForward, Play, Pause, Heart, MicrophoneStage } from 'phosphor-svelte';
 	import { formatLength } from '$lib/format-length';
 	import { cn } from '$lib/cn';
+	import { lyricsMode } from '../stores/lyrics-mode';
 
 	const DEFAULT_COLOR = { background: 'black', text: 'white' };
 	let data: Awaited<ReturnType<typeof getPlaybackState>> | null = null;
 
 	$: trackId = data?.item.id;
+
 	$: isTrackLikedPromise = trackId ? getIsTrackSaved(trackId) : undefined;
 
 	let isMutating = false;
@@ -142,6 +145,10 @@
 			isMutating = false;
 		}
 	};
+
+	$: lyricsPromise = $lyricsMode && trackId ? getSongLyrics(trackId) : undefined;
+
+	let lyricsListElement: HTMLElement;
 </script>
 
 {#if !data}
@@ -150,22 +157,59 @@
 	<div class="h-screen w-screen flex flex-col justify-start items-center p-16 gap-8 relative">
 		<div
 			id="background"
-			class="absolute inset-0 -z-10 saturate-[0.7]"
+			class="absolute inset-0 -z-10 saturate-[0.5]"
 			style="background-color:{albumColor.background}"
 		/>
-		<div class="flex items-center flex-1 min-h-0 w-full">
-			<div class="aspect-square h-full overflow-hidden rounded-2xl shrink-0">
-				{#if albumCover}
-					<img src={albumCover} alt="Album cover" class="object-cover w-full h-full" />
-				{:else}
-					<p>No album cover</p>
-				{/if}
+
+		{#if !$lyricsMode}
+			<div class="flex items-center flex-1 min-h-0 w-full">
+				<div class="aspect-square h-full overflow-hidden rounded-2xl shrink-0">
+					{#if albumCover}
+						<img src={albumCover} alt="Album cover" class="object-cover w-full h-full" />
+					{:else}
+						<p>No album cover</p>
+					{/if}
+				</div>
+				<div class="ml-12 space-y-4 flex-1 min-w-0" style="color:{albumColor.text}">
+					<h1 class="text-7xl font-bold whitespace-nowrap truncate">{songTitle}</h1>
+					<p class="text-6xl opacity-80 whitespace-nowrap truncate">{artist}</p>
+				</div>
 			</div>
-			<div class="ml-12 space-y-4 flex-1 min-w-0" style="color:{albumColor.text}">
-				<h1 class="text-7xl font-bold whitespace-nowrap truncate">{songTitle}</h1>
-				<p class="text-6xl opacity-80 whitespace-nowrap truncate">{artist}</p>
+		{/if}
+
+		{#if $lyricsMode}
+			<div class="flex-1 min-h-0 overflow-scroll relative">
+				{#await lyricsPromise}
+					<p>...loading lyrics</p>
+				{:then lyrics}
+					<div class="space-y-1" bind:this={lyricsListElement}>
+						{#if lyrics}
+							{#each lyrics as { startTimeMs, words }}
+								<p
+									class={cn(
+										'font-bold text-4xl transition-opacity',
+										startTimeMs > progress && 'opacity-30'
+									)}
+									style="color:{albumColor.text}"
+								>
+									{words}
+								</p>
+							{/each}
+						{/if}
+					</div>
+				{:catch e}
+					<p>Failed to load lyrics.</p>
+				{/await}
+
+				<!-- Bottom fade -->
+				<div
+					class="absolute bottom-0 inset-x-0 h-16 saturate-[0.5]"
+					style="background: linear-gradient(transparent,{albumColor.background});"
+				/>
 			</div>
-		</div>
+		{/if}
+
+		<!-- Progress bar -->
 		<div class="flex items-center justify-center w-full gap-2">
 			<div class="text-lg">
 				{formatLength(progress)}
@@ -187,6 +231,7 @@
 
 		<div class="flex items-center gap-4 w-full">
 			<div class="flex-1 flex justify-end items-center">
+				<!-- Like button -->
 				{#await isTrackLikedPromise}
 					<div class="size-24 flex items-center justify-center">
 						<Heart class="size-12 opacity-80" weight="regular" />
@@ -208,6 +253,7 @@
 				{/await}
 			</div>
 
+			<!-- Control buttons -->
 			<button
 				class="size-24 rounded-full flex justify-center items-center"
 				on:click={onPressPrevious}
@@ -231,7 +277,17 @@
 				<SkipForward class="size-12 opacity-80" weight="fill" />
 			</button>
 
-			<div class="flex-1 flex justify-start items-center"></div>
+			<div class="flex-1 flex justify-start items-center">
+				<button class="h-24" on:click={() => lyricsMode.update((v) => !v)}>
+					<div
+						class="rounded-full flex items-center border justify-center px-4 py-2 gap-3"
+						style="border-color:{albumColor.text};"
+					>
+						<MicrophoneStage class="size-6" />
+						<span class="font-semibold text-xl">Lyrics</span>
+					</div>
+				</button>
+			</div>
 		</div>
 	</div>
 {/if}

@@ -1,6 +1,7 @@
 import type { PlaybackState } from './spotify.types';
+import { env } from '$env/dynamic/public';
 
-const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID as string;
+const CLIENT_ID = env.PUBLIC_SPOTIFY_CLIENT_ID as string;
 
 const getRedirectUri = () => {
 	const redirectUri = `${window.location.origin}/auth`;
@@ -90,12 +91,12 @@ const parseAuthResponse = async () => {
 		})
 	};
 
-	const body = await fetch(authUrl, payload);
-	const response = await body.json();
+	const response = await fetch(authUrl, payload);
+	const body = await response.json();
 
-	localStorage.setItem('access_token', response.access_token);
-	localStorage.setItem('expires_at', String(Date.now() + response.expires_in * 1000));
-	localStorage.setItem('refresh_token', response.refresh_token);
+	localStorage.setItem('access_token', body.access_token);
+	localStorage.setItem('expires_at', String(Date.now() + body.expires_in * 1000));
+	localStorage.setItem('refresh_token', body.refresh_token);
 
 	return {
 		success: true
@@ -124,20 +125,20 @@ const refreshTokens = async () => {
 			client_id: CLIENT_ID
 		})
 	};
-	const body = await fetch(authUrl, payload);
+	const response = await fetch(authUrl, payload);
 
-	if (body.status !== 200) {
+	if (response.status !== 200) {
 		return {
 			success: false,
 			error: 'Failed to refresh tokens'
 		};
 	}
 
-	const response = await body.json();
+	const body = await response.json();
 
-	localStorage.setItem('access_token', response.access_token);
-	localStorage.setItem('expires_at', String(Date.now() + response.expires_in * 1000));
-	localStorage.setItem('refresh_token', response.refresh_token);
+	localStorage.setItem('access_token', body.access_token);
+	localStorage.setItem('expires_at', String(Date.now() + body.expires_in * 1000));
+	localStorage.setItem('refresh_token', body.refresh_token);
 
 	return {
 		success: true
@@ -175,15 +176,15 @@ const getIsTrackSaved = async (trackId: string) => {
 		}
 	};
 
-	const body = await fetch(endpoint, payload);
+	const response = await fetch(endpoint, payload);
 
-	if (body.status !== 200) {
+	if (response.status !== 200) {
 		throw new Error('Failed to get track saved state');
 	}
 
-	const response = await body.json();
+	const body = await response.json();
 
-	return response[0] as boolean;
+	return body[0] as boolean;
 };
 
 const getPlaybackState = async () => {
@@ -197,10 +198,10 @@ const getPlaybackState = async () => {
 		}
 	};
 
-	const body = await fetch(endpoint, payload);
-	const response = await body.json();
+	const response = await fetch(endpoint, payload);
+	const body = await response.json();
 
-	return response as PlaybackState;
+	return body as PlaybackState;
 };
 
 const startPlayback = async () => {
@@ -215,9 +216,9 @@ const startPlayback = async () => {
 		}
 	};
 
-	const body = await fetch(endpoint, payload);
+	const response = await fetch(endpoint, payload);
 
-	if (body.status !== 204) throw new Error('Failed to start playback');
+	if (response.status !== 204) throw new Error('Failed to start playback');
 };
 
 const pausePlayback = async () => {
@@ -232,9 +233,9 @@ const pausePlayback = async () => {
 		}
 	};
 
-	const body = await fetch(endpoint, payload);
+	const response = await fetch(endpoint, payload);
 
-	if (body.status !== 204) throw new Error('Failed to pause playback');
+	if (response.status !== 204) throw new Error('Failed to pause playback');
 };
 
 const skipToNext = async () => {
@@ -249,9 +250,9 @@ const skipToNext = async () => {
 		}
 	};
 
-	const body = await fetch(endpoint, payload);
+	const response = await fetch(endpoint, payload);
 
-	if (body.status !== 204) throw new Error('Failed to skip to next track');
+	if (response.status !== 204) throw new Error('Failed to skip to next track');
 };
 
 const skipToPrevious = async () => {
@@ -266,9 +267,9 @@ const skipToPrevious = async () => {
 		}
 	};
 
-	const body = await fetch(endpoint, payload);
+	const response = await fetch(endpoint, payload);
 
-	if (body.status !== 204) throw new Error('Failed to skip to previous track');
+	if (response.status !== 204) throw new Error('Failed to skip to previous track');
 };
 
 const likeTrack = async (trackId: string) => {
@@ -283,9 +284,9 @@ const likeTrack = async (trackId: string) => {
 		}
 	};
 
-	const body = await fetch(endpoint, payload);
+	const response = await fetch(endpoint, payload);
 
-	if (body.status !== 200) throw new Error('Failed to like track');
+	if (response.status !== 200) throw new Error('Failed to like track');
 
 	return true;
 };
@@ -302,11 +303,22 @@ const unlikeTrack = async (trackId: string) => {
 		}
 	};
 
-	const body = await fetch(endpoint, payload);
+	const response = await fetch(endpoint, payload);
 
-	if (body.status !== 200) throw new Error('Failed to unlike track');
+	if (response.status !== 200) throw new Error('Failed to unlike track');
 
 	return true;
+};
+
+const getSongLyrics = async (trackId: string) => {
+	const url = `${window.origin}/api/spotify/lyrics/${trackId}`;
+
+	const response = await fetch(url);
+	if (response.status !== 200) throw new Error('Failed to get lyrics');
+
+	const body = await response.json();
+
+	return body as [{ startTimeMs: number; words: string }];
 };
 
 export {
@@ -320,5 +332,6 @@ export {
 	skipToNext,
 	skipToPrevious,
 	likeTrack,
-	unlikeTrack
+	unlikeTrack,
+	getSongLyrics
 };
