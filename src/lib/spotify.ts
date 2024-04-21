@@ -1,5 +1,6 @@
 import type { PlaybackState } from './spotify.types';
 import { env } from '$env/dynamic/public';
+import { goto } from '$app/navigation';
 
 const CLIENT_ID = env.PUBLIC_SPOTIFY_CLIENT_ID as string;
 
@@ -130,7 +131,7 @@ const refreshTokens = async () => {
 	if (response.status !== 200) {
 		return {
 			success: false,
-			error: 'Failed to refresh tokens'
+			error: 'Failed to refresh tokens.'
 		};
 	}
 
@@ -157,12 +158,18 @@ const getAccessToken = async () => {
 	) {
 		const refreshResult = await refreshTokens();
 		if (!refreshResult.success) {
-			console.error(refreshResult);
+			console.error('Failed to refresh tokens. Redirecting to login.');
+			goto('/start');
 			return null;
 		}
 	}
 
 	return localStorage.getItem('access_token')!;
+};
+
+const isLoggedIn = () => {
+	const accessToken = localStorage.getItem('access_token');
+	return !!accessToken;
 };
 
 const getIsTrackSaved = async (trackId: string) => {
@@ -324,7 +331,7 @@ const getSongLyrics = async (trackId: string) => {
 export {
 	redirectToLogin,
 	parseAuthResponse,
-	refreshTokens,
+	isLoggedIn,
 	getIsTrackSaved,
 	getPlaybackState,
 	startPlayback,
