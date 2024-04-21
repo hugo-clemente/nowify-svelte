@@ -37,11 +37,11 @@
 		staleTime: 10_000
 	});
 
-	$: trackId = $playbackStateQuery.data?.item.id;
+	const trackId = derived(playbackStateQuery, ({ data }) => data?.item.id);
 
 	const isTrackedLikedQuery = createQuery(
-		derived(playbackStateQuery, ({ data }) => ({
-			queryKey: ['is-track-liked', data?.item.id],
+		derived(trackId, (trackId) => ({
+			queryKey: ['is-track-liked', trackId],
 			//@ts-expect-error - this is fine
 			queryFn: async ({ queryKey }) => {
 				const [, trackId] = queryKey;
@@ -219,22 +219,26 @@
 	});
 
 	const lyricsQuery = createQuery(
-		derived(playbackStateQuery, ({ data }) => {
+		derived(trackId, (trackId) => {
 			return {
-				queryKey: ['track-lyrics', data?.item.id],
+				queryKey: ['track-lyrics', trackId],
 				//@ts-expect-error - this is fine
 				queryFn: async ({ queryKey }) => {
 					const [, trackId] = queryKey;
+
 					if (!trackId) return null;
 
 					const data = await getSongLyrics(trackId);
+
 					return data;
 				},
-				enabled: !!data?.item.id,
-				staleTime: 7 * 24 * 60 * 60 * 1000 // 1 week
+				enabled: !!trackId,
+				staleTime: 7 * 24 * 60 * 60 * 1000 // 1 week,
 			};
 		})
 	);
+
+	$: console.log($lyricsQuery);
 
 	let lyricsListElement: HTMLElement;
 
@@ -251,7 +255,15 @@
 </script>
 
 {#if $playbackStateQuery.isLoading}
-	<p>...waiting</p>
+	<div
+		style="background-color:{albumColor.background}"
+		class="h-screen w-screen flex flex-col justify-start items-center"
+	>
+		<div class="text-2xl flex items-center gap-2">
+			<CircleNotch class="size-4 animate-spin" />
+			<p class="font-bold">Loading ...</p>
+		</div>
+	</div>
 {:else}
 	<div class="h-screen w-screen flex flex-col justify-start items-center px-24 pb-16 relative">
 		<div
@@ -296,7 +308,7 @@
 							<CircleNotch class="size-4 animate-spin" />
 							<p class="font-bold">Loading lyrics</p>
 						</div>
-					{:else if $lyricsQuery.data}
+					{:else if $lyricsQuery.data && $lyricsQuery.data.length > 0}
 						<div class="space-y-1 pt-24 pb-8" bind:this={lyricsListElement}>
 							{#each $lyricsQuery.data as { startTimeMs, words }}
 								<p
@@ -312,7 +324,7 @@
 						</div>
 					{:else}
 						<p class="font-bold text-4xl pt-24">
-							No lyrics for this song. You'll have yo sing along by yourself!
+							No lyrics for this song. You'll have to sing along by yourself!
 						</p>
 					{/if}
 				</div>
@@ -341,9 +353,9 @@
 			</div>
 
 			<div class="flex items-center gap-4 w-full">
-				<div class="flex-1 flex justify-end items-center">
+				<div class="flex-1 flex justify-end items-center min-w-0 gap-8">
 					{#if $lyricsMode}
-						<div class="flex-1 flex items-center shrink-0 min-h-0 w-full">
+						<div class="flex-1 flex items-center min-w-0 w-full">
 							<div class="aspect-square h-20 overflow-hidden rounded-lg shrink-0">
 								{#if albumCover}
 									<img src={albumCover} alt="Album cover" class="object-cover w-full h-full" />
@@ -364,10 +376,10 @@
 							class="size-24 rounded-full flex justify-center items-center disabled:opacity-50"
 							disabled={!trackId}
 							on:click={() => {
-								if (trackId)
+								if ($trackId)
 									$isTrackedLikedQuery.data
-										? $unlikeMutation.mutate(trackId)
-										: $likeMutation.mutate(trackId);
+										? $unlikeMutation.mutate($trackId)
+										: $likeMutation.mutate($trackId);
 							}}
 						>
 							<Heart

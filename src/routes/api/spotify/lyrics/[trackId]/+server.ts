@@ -57,6 +57,8 @@ const getSongLyrics = async (trackId: string) => {
 
 	const response = await fetch(endpoint, payload);
 
+	if (response.status === 404) return null;
+
 	if (response.status !== 200) throw new Error('Failed to get lyrics');
 
 	const body = await response.json();
@@ -75,7 +77,9 @@ export const GET: RequestHandler = async ({ params }) => {
 
 	const res = await getSongLyrics(trackId);
 
-	const lines = res.lyrics.lines as {
+	if (res == null) return new Response('Lyrics not found', { status: 404 });
+
+	const lines = res?.lyrics.lines as {
 		startTimeMs: number;
 		words: string;
 	};

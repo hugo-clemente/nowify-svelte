@@ -158,8 +158,8 @@ const getAccessToken = async () => {
 	) {
 		const refreshResult = await refreshTokens();
 		if (!refreshResult.success) {
-			console.error('Failed to refresh tokens. Redirecting to login.');
 			goto('/start');
+			console.error('Failed to refresh tokens. Redirecting to login.');
 			return null;
 		}
 	}
@@ -321,6 +321,8 @@ const getSongLyrics = async (trackId: string) => {
 	const url = `${window.origin}/api/spotify/lyrics/${trackId}`;
 
 	const response = await fetch(url);
+	if (response.status === 404) return null;
+
 	if (response.status !== 200) throw new Error('Failed to get lyrics');
 
 	const body = await response.json();
