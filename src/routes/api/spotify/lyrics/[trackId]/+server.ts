@@ -40,8 +40,6 @@ const getAccessToken = async () => {
 const getSongLyrics = async (trackId: string) => {
 	const endpoint = `https://spclient.wg.spotify.com/color-lyrics/v2/track/${trackId}`;
 
-	console.log(endpoint);
-
 	const token = await getAccessToken();
 
 	const payload = {
@@ -58,8 +56,6 @@ const getSongLyrics = async (trackId: string) => {
 	};
 
 	const response = await fetch(endpoint, payload);
-
-	console.log(response);
 
 	if (response.status !== 200) throw new Error('Failed to get lyrics');
 
