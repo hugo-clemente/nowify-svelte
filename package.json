@@ -36,6 +36,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@sveltejs/adapter-vercel": "^6.2.0",
 		"@tanstack/query-persist-client-core": "^5.29.0",
 		"@tanstack/svelte-query": "^5.29.0",
 		"@tanstack/svelte-query-devtools": "^5.29.0",
