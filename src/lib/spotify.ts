@@ -1,11 +1,14 @@
 import type { PlaybackState } from './spotify.types';
-import { env } from '$env/dynamic/public';
+import { PUBLIC_SPOTIFY_CLIENT_ID } from '$env/static/public';
 import { goto } from '$app/navigation';
 
-const CLIENT_ID = env.PUBLIC_SPOTIFY_CLIENT_ID as string;
+import { VERCEL_URL } from '$env/static/private';
+
+const HOSTED_URL = `https://${VERCEL_URL}` || 'http://127.0.0.1:5173';
+const CLIENT_ID = PUBLIC_SPOTIFY_CLIENT_ID as string;
 
 const getRedirectUri = () => {
-	const redirectUri = `http://127.0.0.1:5173/auth`;
+	const redirectUri = `${HOSTED_URL}/auth`;
 	return redirectUri;
 };
 
