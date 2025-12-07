@@ -12,7 +12,15 @@
 	} from '$lib/spotify';
 	import { onDestroy, onMount } from 'svelte';
 	import Vibrant from 'node-vibrant';
-	import { SkipBack, SkipForward, Play, Pause, Heart, MicrophoneStage } from 'phosphor-svelte';
+	import {
+		SkipBack,
+		SkipForward,
+		Play,
+		Pause,
+		Heart,
+		MicrophoneStage,
+		ArrowClockwise
+	} from 'phosphor-svelte';
 	import { formatLength } from '$lib/format-length';
 	import { cn } from '$lib/cn';
 	import { lyricsMode } from '../stores/lyrics-mode';
@@ -33,7 +41,7 @@
 			const data = await getPlaybackState();
 			return data;
 		},
-		refetchInterval: 1000,
+		refetchInterval: 500,
 		staleTime: 10_000
 	});
 
@@ -51,7 +59,7 @@
 				return data;
 			},
 			enabled: !!trackId,
-			refetchInterval: 20 * 1000, // 20 seconds
+			refetchInterval: 10 * 1000, // 10 seconds
 			staleTime: 60 * 60 * 1000 // 1 hour
 		}))
 	);
@@ -59,6 +67,7 @@
 	$: songTitle = $playbackStateQuery.data?.item.name;
 	$: artist = $playbackStateQuery.data?.item.artists.map((artist) => artist.name).join(', ');
 	$: albumCover = $playbackStateQuery.data?.item.album.images.at(0)?.url;
+	$: albumName = $playbackStateQuery.data?.item.album.name;
 	$: songLength = $playbackStateQuery.data?.item.duration_ms || 1; // to prevent division by zero
 	$: isPlaying = $playbackStateQuery.data?.is_playing;
 
@@ -219,37 +228,49 @@
 	});
 
 	const lyricsQuery = createQuery(
-		derived(trackId, (trackId) => {
+		derived([playbackStateQuery], ([{ data }]) => {
+			const songTitle = data?.item.name;
+			const artist = data?.item.artists?.map((artist) => artist.name).join(', ');
+			const albumName = data?.item.album.name;
+			const songLength = data?.item.duration_ms || 1;
+
 			return {
-				queryKey: ['track-lyrics', trackId],
-				//@ts-expect-error - this is fine
-				queryFn: async ({ queryKey }) => {
-					const [, trackId] = queryKey;
+				queryKey: ['track-lyrics', songTitle, artist, albumName, songLength],
+				queryFn: async () => {
+					if (!songTitle || !artist || !albumName) return null;
 
-					if (!trackId) return null;
+					const lyrics = await getSongLyrics(songTitle, artist, albumName, songLength / 1000);
 
-					const data = await getSongLyrics(trackId);
-
-					return data;
+					return lyrics;
 				},
-				enabled: !!trackId,
-				staleTime: 7 * 24 * 60 * 60 * 1000 // 1 week,
+				enabled: !!songTitle && !!artist && !!albumName,
+				staleTime: 7 * 24 * 60 * 60 * 1000 // 1 week
 			};
 		})
 	);
 
-	$: console.log($lyricsQuery);
-
 	let lyricsListElement: HTMLElement;
+	let lastScrolledIndex = -1;
 
 	$: {
-		if ($lyricsMode && $lyricsQuery.data) {
-			const currentLyric = $lyricsQuery.data.findIndex(({ startTimeMs }) => startTimeMs > progress);
+		if ($lyricsMode && $lyricsQuery.data && $lyricsQuery.data.length > 0) {
+			// Find the current lyric (last one that has started)
+			let currentLyricIndex = -1;
+			for (let i = $lyricsQuery.data.length - 1; i >= 0; i--) {
+				if ($lyricsQuery.data[i].startTimeMs <= progress) {
+					currentLyricIndex = i;
+					break;
+				}
+			}
 
-			lyricsListElement?.children.item(currentLyric)?.scrollIntoView({
-				behavior: 'smooth',
-				block: 'center'
-			});
+			// Only scroll if we've moved to a different lyric
+			if (currentLyricIndex !== -1 && currentLyricIndex !== lastScrolledIndex) {
+				lastScrolledIndex = currentLyricIndex;
+				lyricsListElement?.children.item(currentLyricIndex)?.scrollIntoView({
+					behavior: 'smooth',
+					block: 'center'
+				});
+			}
 		}
 	}
 </script>
@@ -265,11 +286,13 @@
 		</div>
 	</div>
 {:else}
-	<div class="h-screen w-screen flex flex-col justify-start items-center px-24 pb-16 relative">
+	<div
+		class="h-screen w-screen flex flex-col justify-start items-center px-24 pb-16 relative text-[--text-color]"
+		style="--text-color:{albumColor.text};--background-color:{albumColor.background}; transition: --text-color 0.3s, --background-color 0.3s;"
+	>
 		<div
 			id="background"
-			class="absolute inset-0 -z-10 saturate-[0.5] bottom-0"
-			style="background-color:{albumColor.background}"
+			class="absolute inset-0 -z-10 saturate-[0.5] bottom-0 transition-[background] duration-300 bg-[--background-color]"
 		/>
 
 		{#if !$lyricsMode}
@@ -281,7 +304,7 @@
 						<div class="w-full h-full bg-gray-300" />
 					{/if}
 				</div>
-				<div class="ml-12 space-y-4 flex-1 min-w-0" style="color:{albumColor.text}">
+				<div class="ml-12 space-y-4 flex-1 min-w-0">
 					<h1 class="text-7xl font-bold whitespace-nowrap truncate">{songTitle}</h1>
 					<p class="text-6xl opacity-80 whitespace-nowrap truncate">{artist}</p>
 				</div>
@@ -292,14 +315,14 @@
 			<div class="flex-1 min-h-0 relative w-full flex flex-col mb-4">
 				<!-- Top fade -->
 				<div
-					class="absolute top-0 inset-x-0 h-24 saturate-[0.5] z-10"
-					style="background: linear-gradient({albumColor.background},transparent);"
+					class="absolute top-0 inset-x-0 h-24 saturate-[0.5] z-10 duration-300"
+					style="background: linear-gradient(var(--background-color),transparent);"
 				/>
 
 				<!-- Bottom fade -->
 				<div
-					class="absolute bottom-0 inset-x-0 h-8 saturate-[0.5] z-10"
-					style="background: linear-gradient(transparent,{albumColor.background});"
+					class="absolute bottom-0 inset-x-0 h-8 saturate-[0.5] z-10 transition-[background] duration-300"
+					style="background: linear-gradient(transparent,var(--background-color));"
 				/>
 
 				<div class="overflow-y-hidden flex-1 hover:overflow-y-auto">
@@ -316,7 +339,6 @@
 										'font-bold text-4xl transition-opacity',
 										startTimeMs > progress && 'opacity-20'
 									)}
-									style="color:{albumColor.text}"
 								>
 									{words}
 								</p>
@@ -340,11 +362,11 @@
 				<div class="flex-1 relative h-1.5">
 					<div
 						class="absolute inset-0 rounded-full"
-						style="background-color:{albumColor.text};width:{(progress / songLength) * 100}%"
+						style="background-color:var(--text-color);width:{(progress / songLength) * 100}%"
 					/>
 					<div
 						class="absolute inset-0 rounded-full opacity-40"
-						style="background-color:{albumColor.text}"
+						style="background-color:var(--text-color)"
 					/>
 				</div>
 				<div class="text-lg">
@@ -363,7 +385,7 @@
 									<div class="w-full h-full bg-gray-300" />
 								{/if}
 							</div>
-							<div class="ml-4 flex-1 min-w-0" style="color:{albumColor.text}">
+							<div class="ml-4 flex-1 min-w-0">
 								<h1 class="text-3xl font-bold whitespace-nowrap truncate">{songTitle}</h1>
 								<p class="text-xl opacity-80 whitespace-nowrap truncate">{artist}</p>
 							</div>
@@ -406,8 +428,7 @@
 				</button>
 
 				<button
-					class="size-24 rounded-full flex justify-center items-center"
-					style="background-color:{albumColor.text}"
+					class="size-24 rounded-full flex justify-center items-center bg-[--text-color]"
 					on:click={() => (isPlaying ? $pauseMutation.mutate() : $playMutation.mutate())}
 				>
 					{#if isPlaying}
@@ -424,15 +445,21 @@
 					<SkipForward class="size-12 opacity-80" weight="fill" />
 				</button>
 
-				<div class="flex-1 flex justify-start items-center">
+				<div class="flex-1 flex justify-between items-center">
 					<button class="h-24" on:click={() => lyricsMode.update((v) => !v)}>
 						<div
-							class="rounded-full flex items-center border justify-center px-4 py-2 gap-3"
-							style="border-color:{albumColor.text};"
+							class="rounded-full flex items-center border justify-center px-4 py-2 gap-3 border-[--text-color]"
 						>
 							<MicrophoneStage class="size-6" />
 							<span class="font-semibold text-xl">Lyrics</span>
 						</div>
+					</button>
+
+					<button
+						class="size-24 rounded-full flex justify-center items-center"
+						on:click={() => location.reload()}
+					>
+						<ArrowClockwise class="size-12 opacity-80" weight="fill" />
 					</button>
 				</div>
 			</div>

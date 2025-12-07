@@ -5,7 +5,7 @@ import { goto } from '$app/navigation';
 const CLIENT_ID = env.PUBLIC_SPOTIFY_CLIENT_ID as string;
 
 const getRedirectUri = () => {
-	const redirectUri = `${window.location.origin}/auth`;
+	const redirectUri = `http://127.0.0.1:5173/auth`;
 	return redirectUri;
 };
 
@@ -317,8 +317,13 @@ const unlikeTrack = async (trackId: string) => {
 	return true;
 };
 
-const getSongLyrics = async (trackId: string) => {
-	const url = `${window.origin}/api/spotify/lyrics/${trackId}`;
+const getSongLyrics = async (
+	trackName: string,
+	artistName: string,
+	albumName: string,
+	durationS: number
+) => {
+	const url = `${window.origin}/api/lyrics?track_name=${trackName}&artist_name=${artistName}&album_name=${albumName}&duration=${durationS}`;
 
 	const response = await fetch(url);
 	if (response.status === 404) return null;

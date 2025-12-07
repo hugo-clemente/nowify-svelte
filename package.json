@@ -44,6 +44,7 @@
     "idb-keyval": "^6.2.1",
     "node-vibrant": "^3.1.6",
     "phosphor-svelte": "^2.0.1",
-    "tailwind-merge": "^2.3.0"
+    "tailwind-merge": "^2.3.0",
+    "zod": "^4.1.13"
   }
 }
